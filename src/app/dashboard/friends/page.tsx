@@ -4,9 +4,12 @@ import { requireUserId, getWeightUnit } from "@/lib/dal";
 import {
   getFriendships,
   getFriendLeaderboard,
+  getFriendActivity,
+  getExerciseLeaderboard,
   searchUsersByUsername,
   type FriendUser,
 } from "@/lib/queries/friends";
+import { getExerciseNames } from "@/lib/queries/exercises";
 import { getUserProfile } from "@/lib/queries/users";
 import {
   sendFriendRequest,
@@ -18,17 +21,39 @@ import {
 import { FriendActionButton } from "@/components/friends/friend-action-button";
 import { formatWeight, formatVolume } from "@/lib/units";
 
+// "YYYY-MM-DD" → "Jul 3" in the local format.
+function formatActivityDay(date: string) {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default async function FriendsPage(
   props: PageProps<"/dashboard/friends">,
 ) {
   const userId = await requireUserId();
   const searchParams = await props.searchParams;
   const q = typeof searchParams.q === "string" ? searchParams.q : "";
+  const ex = typeof searchParams.ex === "string" ? searchParams.ex : "";
 
-  const [profile, friendships, leaderboard, results, unit] = await Promise.all([
+  const [
+    profile,
+    friendships,
+    leaderboard,
+    activity,
+    exerciseNames,
+    exerciseBoard,
+    results,
+    unit,
+  ] = await Promise.all([
     getUserProfile(userId),
     getFriendships(userId),
     getFriendLeaderboard(userId),
+    getFriendActivity(userId),
+    getExerciseNames(userId),
+    ex ? getExerciseLeaderboard(userId, ex) : Promise.resolve([]),
     q ? searchUsersByUsername(userId, q) : Promise.resolve([]),
     getWeightUnit(),
   ]);
@@ -46,6 +71,7 @@ export default async function FriendsPage(
       </section>
 
       {friends.length > 0 ? (
+        <>
         <section>
           <h2 className="ledger-title mb-3">Leaderboard — last 30 days</h2>
           <div className="sheet overflow-x-auto p-0 sm:p-0">
@@ -104,6 +130,151 @@ export default async function FriendsPage(
             </table>
           </div>
         </section>
+
+        {exerciseNames.length > 0 ? (
+          <section>
+            <h2 className="ledger-title mb-3">Head to head</h2>
+            <div className="sheet">
+              <form action="/dashboard/friends" className="flex gap-2">
+                {q ? <input type="hidden" name="q" value={q} /> : null}
+                <select
+                  name="ex"
+                  defaultValue={ex}
+                  className="input flex-1"
+                  aria-label="Exercise to compare"
+                >
+                  <option value="" disabled>
+                    Pick a lift…
+                  </option>
+                  {exerciseNames.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" className="btn btn-primary shrink-0">
+                  Compare
+                </button>
+              </form>
+
+              {ex ? (
+                <div className="mt-4 overflow-x-auto border-t border-[var(--color-rule)]">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--color-rule)] text-left font-mono text-[11px] uppercase tracking-wider text-[var(--color-muted)]">
+                        <th className="py-2.5 pr-3 font-medium">#</th>
+                        <th className="py-2.5 font-medium">Lifter</th>
+                        <th className="py-2.5 text-right font-medium">
+                          Best set
+                        </th>
+                        <th className="py-2.5 text-right font-medium">
+                          Est. 1RM
+                        </th>
+                        <th className="py-2.5 pl-3 text-right font-medium">
+                          When
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {exerciseBoard.map((row, i) => (
+                        <tr
+                          key={row.id}
+                          className="border-b border-[var(--color-rule-soft)] last:border-b-0"
+                        >
+                          <td className="py-3 pr-3 font-mono tabular-nums">
+                            {i === 0 && row.best ? (
+                              <span className="pr-ring">{i + 1}</span>
+                            ) : (
+                              i + 1
+                            )}
+                          </td>
+                          <td
+                            className={`py-3 font-medium ${
+                              row.isYou ? "text-[var(--color-green)]" : ""
+                            }`}
+                          >
+                            {row.name ?? row.username ?? "Lifter"}
+                            {row.isYou ? " (you)" : ""}
+                          </td>
+                          <td className="py-3 text-right font-mono tabular-nums">
+                            {row.best
+                              ? `${formatWeight(row.best.weight, unit)} × ${row.best.reps}`
+                              : "—"}
+                          </td>
+                          <td className="py-3 text-right font-mono tabular-nums">
+                            {row.best
+                              ? formatWeight(row.best.oneRm, unit)
+                              : "—"}
+                          </td>
+                          <td className="py-3 pl-3 text-right font-mono text-xs text-[var(--color-muted)]">
+                            {row.best
+                              ? row.best.performedAt.toLocaleDateString(
+                                  undefined,
+                                  { month: "short", day: "numeric" },
+                                )
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-[var(--color-muted)]">
+                  Compare one lift across your crew — matched by exercise
+                  name.
+                </p>
+              )}
+            </div>
+          </section>
+        ) : null}
+
+        {activity.length > 0 ? (
+          <section>
+            <h2 className="ledger-title mb-3">Recent activity</h2>
+            <ul className="sheet p-0 sm:p-0">
+              {activity.map((a) => (
+                <li
+                  key={`${a.user.id}|${a.date}`}
+                  className="flex flex-col gap-1 border-b border-[var(--color-rule-soft)] px-4 py-3 last:border-b-0 sm:px-5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Avatar user={a.user} size={24} />
+                      <span className="truncate text-sm font-medium">
+                        {a.user.name ?? a.user.username ?? "Lifter"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 font-mono text-xs text-[var(--color-muted)]">
+                      {formatActivityDay(a.date)}
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-[var(--color-muted)]">
+                    {a.totalSets} set{a.totalSets === 1 ? "" : "s"} ·{" "}
+                    {formatVolume(a.totalVolume, unit)} ·{" "}
+                    {a.exerciseNames.slice(0, 3).join(", ")}
+                    {a.exerciseNames.length > 3 ? "…" : ""}
+                  </p>
+                  {a.prs.map((pr) => (
+                    <p
+                      key={pr.exerciseName}
+                      className="flex flex-wrap items-center gap-x-2 font-mono text-sm"
+                    >
+                      <span className="truncate">{pr.exerciseName}</span>
+                      <span className={pr.weightPr ? "pr-ring" : undefined}>
+                        {formatWeight(pr.weight, unit)} × {pr.reps}
+                      </span>
+                      <span className="ink-note">
+                        {pr.weightPr ? "PR" : "1RM PR"}
+                      </span>
+                    </p>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        </>
       ) : null}
 
       <section>
@@ -122,6 +293,7 @@ export default async function FriendsPage(
             </p>
           ) : null}
           <form action="/dashboard/friends" className="flex gap-2">
+            {ex ? <input type="hidden" name="ex" value={ex} /> : null}
             <div className="relative flex-1">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--color-muted)]">
                 @

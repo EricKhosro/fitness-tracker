@@ -7,6 +7,7 @@ import { ProgressionChart } from "@/components/exercises/progression-chart";
 import { EditableSetRow } from "@/components/sets/editable-set-row";
 import { RestTimer } from "@/components/sets/rest-timer";
 import { fromKg, formatWeight, formatVolume } from "@/lib/units";
+import { computePrFlags } from "@/lib/prs";
 
 export default async function ExercisePage(
   props: PageProps<"/dashboard/exercise/[id]">,
@@ -31,18 +32,8 @@ export default async function ExercisePage(
     estimatedOneRepMax: fromKg(p.estimatedOneRepMax, unit),
   }));
 
-  // Walk sets chronologically to flag personal records (weight and est. 1RM).
-  const prMap = new Map<string, { weight: boolean; oneRm: boolean }>();
-  let maxWeight = 0;
-  let maxOneRm = 0;
-  for (const s of exercise.sets) {
-    const oneRm = s.weight * (1 + s.reps / 30);
-    const weightPr = s.weight > maxWeight;
-    const oneRmPr = oneRm > maxOneRm + 1e-9;
-    if (weightPr) maxWeight = s.weight;
-    if (oneRmPr) maxOneRm = oneRm;
-    prMap.set(s.id, { weight: weightPr, oneRm: oneRmPr });
-  }
+  // Sets arrive chronologically, so the PR walk sees history in order.
+  const prMap = computePrFlags(exercise.sets);
 
   const sets = [...exercise.sets].reverse(); // newest first for the table
   const last = exercise.sets[exercise.sets.length - 1];

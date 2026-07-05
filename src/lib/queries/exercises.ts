@@ -50,6 +50,16 @@ export async function getExerciseSummaries(
   }));
 }
 
+// Just the names of a user's exercises, for pickers.
+export async function getExerciseNames(userId: string): Promise<string[]> {
+  const rows = await prisma.exercise.findMany({
+    where: { userId },
+    orderBy: { name: "asc" },
+    select: { name: true },
+  });
+  return rows.map((r) => r.name);
+}
+
 // A single exercise (scoped to the owner) with all of its logged sets.
 export async function getExerciseWithSets(userId: string, exerciseId: string) {
   return prisma.exercise.findFirst({

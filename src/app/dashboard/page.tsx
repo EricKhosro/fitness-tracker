@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { requireUserId, getWeightUnit } from "@/lib/dal";
 import { getExerciseSummaries } from "@/lib/queries/exercises";
+import { getRecentPrs } from "@/lib/queries/prs";
 import { AddExerciseForm } from "@/components/exercises/add-exercise-form";
 import { LogSetForm } from "@/components/sets/log-set-form";
 import { ExerciseList } from "@/components/exercises/exercise-list";
@@ -8,8 +10,9 @@ import { formatWeight } from "@/lib/units";
 
 export default async function DashboardPage() {
   const userId = await requireUserId();
-  const [exercises, unit] = await Promise.all([
+  const [exercises, prs, unit] = await Promise.all([
     getExerciseSummaries(userId),
+    getRecentPrs(userId),
     getWeightUnit(),
   ]);
 
@@ -48,6 +51,46 @@ export default async function DashboardPage() {
           />
         </dl>
       </section>
+
+      {prs.length > 0 ? (
+        <section>
+          <h2 className="ledger-title mb-3">
+            Recent PRs
+            <span className="font-mono text-xs font-normal normal-case tracking-normal text-[var(--color-red)]">
+              {prs.length} this month
+            </span>
+          </h2>
+          <ul className="sheet p-0 sm:p-0">
+            {prs.slice(0, 6).map((pr) => (
+              <li
+                key={pr.setId}
+                className="flex items-center justify-between gap-3 border-b border-[var(--color-rule-soft)] px-4 py-3 last:border-b-0 sm:px-5"
+              >
+                <Link
+                  href={`/dashboard/exercise/${pr.exerciseId}`}
+                  className="min-w-0 truncate font-medium hover:text-[var(--color-green)]"
+                >
+                  {pr.exerciseName}
+                </Link>
+                <span className="flex shrink-0 items-center gap-2 font-mono text-sm">
+                  <span className={pr.weightPr ? "pr-ring" : undefined}>
+                    {formatWeight(pr.weight, unit)} × {pr.reps}
+                  </span>
+                  <span className="ink-note">
+                    {pr.weightPr ? "PR" : "1RM PR"}
+                  </span>
+                  <span className="text-xs font-normal text-[var(--color-muted)]">
+                    {pr.performedAt.toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section>
