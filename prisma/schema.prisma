@@ -1,0 +1,171 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js (NextAuth) models — database session strategy
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  username      String?   @unique // handle friends find you by; user-chosen
+  weightUnit    String    @default("kg") // "kg" | "lb" — display preference
+  accounts      Account[]
+  sessions      Session[]
+  exercises     Exercise[]
+  sets          WorkoutSet[]
+  bodyMetrics   BodyMetric[]
+  routines      Routine[]
+  sentFriendRequests     Friendship[] @relation("FriendshipRequester")
+  receivedFriendRequests Friendship[] @relation("FriendshipAddressee")
+  createdAt     DateTime  @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Fitness tracking models
+// ---------------------------------------------------------------------------
+
+// A named exercise belonging to a user, e.g. "Bench Press", "Squat".
+model Exercise {
+  id          String       @id @default(cuid())
+  name        String
+  muscleGroup String?      // "Chest", "Back", … — null for custom exercises
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sets        WorkoutSet[]
+  routineItems RoutineItem[]
+  createdAt   DateTime      @default(now())
+
+  // Each user has at most one exercise with a given name.
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// A single logged set: the weight lifted and the number of reps, on a date.
+model WorkoutSet {
+  id         String   @id @default(cuid())
+  userId     String
+  exerciseId String
+  weight     Float
+  reps       Int
+  notes      String?
+  performedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, exerciseId, performedAt])
+}
+
+// A logged body measurement: bodyweight (kg) or a circumference (cm), on a date.
+model BodyMetric {
+  id          String   @id @default(cuid())
+  userId      String
+  kind        String   // "bodyweight" | "waist" | "chest" | "arm" | "thigh" | "hips"
+  value       Float    // bodyweight stored in kg; circumferences in cm
+  notes       String?
+  performedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, performedAt])
+}
+
+// A reusable, named workout template — an ordered list of exercises.
+model Routine {
+  id        String        @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime      @default(now())
+
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items RoutineItem[]
+
+  // Each user has at most one routine with a given name.
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// A friend connection between two users. Created as PENDING by the requester;
+// the addressee can accept it. One row per pair (either direction).
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId])
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+// One exercise within a routine, with its display order.
+model RoutineItem {
+  id         String @id @default(cuid())
+  routineId  String
+  exerciseId String
+  position   Int    @default(0)
+
+  routine  Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([routineId, exerciseId])
+  @@index([routineId])
+}

@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+/*
+ * RepLog — "training ledger" design language.
+ *
+ * The app is a digital version of the paper logbook lifters carry:
+ * bone paper ground, ink text, ledger-green actions, red-ink marks for
+ * PRs and destructive actions, ruled tables with mono figures, and
+ * condensed record-board headings.
+ */
+@theme {
+  --color-paper: #f2f2eb; /* bone paper ground */
+  --color-sheet: #fbfbf6; /* white sheet panels */
+  --color-rule: #d8d7c8; /* printed rule lines */
+  --color-rule-soft: #e6e5d8; /* graph-paper grid */
+  --color-ink: #22271e; /* soft black-green ink */
+  --color-muted: #686c5e; /* pencil grey-olive */
+  --color-green: #2d5a3c; /* ledger green — primary actions */
+  --color-green-deep: #234830;
+  --color-red: #b23425; /* red ink — PRs, errors, deletes */
+  --color-ink-hover: #000000;
+
+  --font-sans: var(--font-barlow);
+  --font-display: var(--font-barlow-condensed);
+  --font-mono: var(--font-plex-mono);
+}
+
+/* Class-based dark variant: the theme toggle stamps `dark` on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Midnight ledger — the same page after lights-out. */
+html.dark {
+  --color-paper: #191b14;
+  --color-sheet: #21241b;
+  --color-rule: #3b3e30;
+  --color-rule-soft: #2b2e23;
+  --color-ink: #e9e7d8;
+  --color-muted: #a2a48f;
+  --color-green: #8fbf9a;
+  --color-green-deep: #a8d3b2;
+  --color-red: #e0705c;
+  --color-ink-hover: #ffffff;
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--color-green);
+  color: var(--color-sheet);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-green);
+  outline-offset: 2px;
+}
+
+/* The ledger heading double rule, e.g. under the app header. */
+.rule-double {
+  border-bottom: 3px double var(--color-ink);
+}
+
+/* Hand-drawn red-ink ellipse around a PR figure, like circling a number
+   in a notebook. */
+.pr-ring {
+  position: relative;
+  display: inline-block;
+  padding: 0 0.35em;
+}
+.pr-ring::after {
+  content: "";
+  position: absolute;
+  inset: -0.2em -0.15em;
+  border: 1.5px solid var(--color-red);
+  border-radius: 50%;
+  transform: rotate(-2.5deg);
+  pointer-events: none;
+}
+
+@layer components {
+  /* A sheet of the logbook: white panel with a printed rule border. */
+  .sheet {
+    @apply rounded border border-[var(--color-rule)] bg-[var(--color-sheet)] p-4 sm:p-5;
+  }
+
+  /* Section heading with a rule running to the end of the line. */
+  .ledger-title {
+    @apply flex items-center gap-3 font-display text-sm font-semibold uppercase tracking-[0.14em] text-[var(--color-ink)];
+  }
+  .ledger-title::after {
+    content: "";
+    @apply h-px flex-1 bg-[var(--color-rule)];
+  }
+
+  .eyebrow {
+    @apply font-display text-xs font-medium uppercase tracking-[0.22em] text-[var(--color-muted)];
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-[3px] px-4 py-2.5 font-display text-sm font-semibold uppercase tracking-[0.08em] transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-[var(--color-green)] text-[var(--color-sheet)] hover:bg-[var(--color-green-deep)];
+  }
+  .btn-ink {
+    @apply bg-[var(--color-ink)] text-[var(--color-sheet)] hover:bg-[var(--color-ink-hover)];
+  }
+  .btn-ghost {
+    @apply border border-[var(--color-rule)] bg-transparent text-[var(--color-ink)] hover:border-[var(--color-ink)];
+  }
+
+  .input {
+    @apply w-full rounded-[3px] border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2.5 text-sm text-[var(--color-ink)] outline-none placeholder:text-[var(--color-muted)]/70 focus:border-[var(--color-ink)];
+  }
+  .label {
+    @apply mb-1.5 block font-mono text-[11px] uppercase tracking-wider text-[var(--color-muted)];
+  }
+
+  /* Bracketed mono tag for muscle groups: renders as [CHEST]. */
+  .tag {
+    @apply font-mono text-[10px] uppercase tracking-wide text-[var(--color-muted)];
+  }
+  .tag::before {
+    content: "[\00a0";
+  }
+  .tag::after {
+    content: "\00a0]";
+  }
+
+  /* Small red-ink annotation, e.g. "PR". */
+  .ink-note {
+    @apply font-mono text-[10px] font-semibold uppercase tracking-wide text-[var(--color-red)];
+  }
+}
