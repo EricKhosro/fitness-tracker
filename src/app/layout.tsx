@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Barlow, Barlow_Condensed, IBM_Plex_Mono } from "next/font/google";
+import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import "./globals.css";
 
 const barlow = Barlow({
@@ -24,6 +25,18 @@ export const metadata: Metadata = {
   title: "RepLog — Training log",
   description:
     "A no-nonsense training logbook. Write down every set, mark your PRs, watch the bar go up.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "RepLog",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f2f2eb" },
+    { media: "(prefers-color-scheme: dark)", color: "#191b14" },
+  ],
 };
 
 export default function RootLayout({
@@ -45,7 +58,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ServiceWorkerRegistration />
+        {children}
+      </body>
     </html>
   );
 }
